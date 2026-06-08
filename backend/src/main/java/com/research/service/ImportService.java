@@ -28,6 +28,8 @@ public class ImportService {
     private final CitationRepository citationRepository;
     private final PaperAuthorRepository paperAuthorRepository;
     private final PaperInstitutionRepository paperInstitutionRepository;
+    private final BibTeXParserService bibTeXParserService;
+    private final RisParserService risParserService;
 
     @Transactional
     public ImportResultDTO importPapersFromJson(List<PaperImportDTO> paperDTOs) {
@@ -367,5 +369,83 @@ public class ImportService {
             }
         }
         return null;
+    }
+
+    @Transactional
+    public ImportResultDTO importPapersFromBibTeX(MultipartFile file) {
+        ImportResultDTO result = new ImportResultDTO();
+        result.setSuccessCount(0);
+        result.setFailCount(0);
+        List<ImportResultDTO.ErrorDetail> errors = new ArrayList<>();
+
+        try {
+            String content = new String(file.getBytes(), StandardCharsets.UTF_8);
+            List<PaperImportDTO> paperDTOs = bibTeXParserService.parse(content);
+
+            if (paperDTOs.isEmpty()) {
+                throw new IllegalArgumentException("BibTeX文件中没有解析到有效条目");
+            }
+
+            for (int i = 0; i < paperDTOs.size(); i++) {
+                try {
+                    importSinglePaper(paperDTOs.get(i));
+                    result.setSuccessCount(result.getSuccessCount() + 1);
+                } catch (Exception e) {
+                    result.setFailCount(result.getFailCount() + 1);
+                    ImportResultDTO.ErrorDetail error = new ImportResultDTO.ErrorDetail();
+                    error.setRowIndex(i + 1);
+                    error.setMessage(e.getMessage());
+                    errors.add(error);
+                }
+            }
+        } catch (Exception e) {
+            result.setFailCount(result.getFailCount() + 1);
+            ImportResultDTO.ErrorDetail error = new ImportResultDTO.ErrorDetail();
+            error.setRowIndex(-1);
+            error.setMessage("文件读取或解析失败: " + e.getMessage());
+            errors.add(error);
+        }
+
+        result.setErrors(errors);
+        return result;
+    }
+
+    @Transactional
+    public ImportResultDTO importPapersFromRis(MultipartFile file) {
+        ImportResultDTO result = new ImportResultDTO();
+        result.setSuccessCount(0);
+        result.setFailCount(0);
+        List<ImportResultDTO.ErrorDetail> errors = new ArrayList<>();
+
+        try {
+            String content = new String(file.getBytes(), StandardCharsets.UTF_8);
+            List<PaperImportDTO> paperDTOs = risParserService.parse(content);
+
+            if (paperDTOs.isEmpty()) {
+                throw new IllegalArgumentException("RIS文件中没有解析到有效条目");
+            }
+
+            for (int i = 0; i < paperDTOs.size(); i++) {
+                try {
+                    importSinglePaper(paperDTOs.get(i));
+                    result.setSuccessCount(result.getSuccessCount() + 1);
+                } catch (Exception e) {
+                    result.setFailCount(result.getFailCount() + 1);
+                    ImportResultDTO.ErrorDetail error = new ImportResultDTO.ErrorDetail();
+                    error.setRowIndex(i + 1);
+                    error.setMessage(e.getMessage());
+                    errors.add(error);
+                }
+            }
+        } catch (Exception e) {
+            result.setFailCount(result.getFailCount() + 1);
+            ImportResultDTO.ErrorDetail error = new ImportResultDTO.ErrorDetail();
+            error.setRowIndex(-1);
+            error.setMessage("文件读取或解析失败: " + e.getMessage());
+            errors.add(error);
+        }
+
+        result.setErrors(errors);
+        return result;
     }
 }

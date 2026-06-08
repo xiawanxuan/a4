@@ -90,7 +90,7 @@
             <el-upload
               :show-file-list="false"
               :before-upload="handleBeforeUpload"
-              accept=".json,.csv"
+              accept=".json,.csv,.bib,.bibtex,.ris,.enw,.endnote,.nbib"
               style="margin-right: 10px"
             >
               <el-button type="success">
@@ -106,12 +106,14 @@
         </div>
       </template>
 
-      <el-table
-        v-loading="paperStore.loading"
-        :data="paperStore.papers"
-        stripe
-        style="width: 100%"
-      >
+      <div class="table-wrapper">
+        <el-table
+          v-loading="paperStore.loading"
+          :data="paperStore.papers"
+          stripe
+          table-layout="fixed"
+          style="width: 100%"
+        >
         <el-table-column type="index" label="序号" width="70" align="center" />
         <el-table-column prop="title" label="标题" min-width="280" show-overflow-tooltip>
           <template #default="{ row }">
@@ -139,6 +141,7 @@
           </template>
         </el-table-column>
       </el-table>
+      </div>
 
       <el-pagination
         v-model:current-page="paperStore.pageNum"
@@ -222,7 +225,7 @@
           :file-list="importFileList"
           :on-change="handleImportFileChange"
           :on-remove="handleImportFileRemove"
-          accept=".json,.csv"
+          accept=".json,.csv,.bib,.bibtex,.ris,.enw,.endnote,.nbib"
           multiple
         >
           <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
@@ -231,7 +234,7 @@
           </div>
           <template #tip>
             <div class="el-upload__tip">
-              支持 JSON/CSV 格式文件
+              支持 JSON/CSV/BibTeX/RIS/EndNote 格式文件
             </div>
           </template>
         </el-upload>
@@ -260,6 +263,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, type FormInstance, type UploadFile, type UploadFiles } from 'element-plus'
 import { Search, Upload, Plus, UploadFilled } from '@element-plus/icons-vue'
 import { usePaperStore } from '@/stores/paper'
+import { importBibTeX, importRis, importEndNote, importCsv } from '@/api/import'
 import type { Paper, PaperQueryParams, ImportResult } from '@/types'
 
 const router = useRouter()
@@ -452,10 +456,31 @@ async function handleSubmit() {
   }
 }
 
+function getFileType(fileName: string): 'json' | 'csv' | 'bibtex' | 'ris' | 'endnote' | null {
+  const ext = fileName.toLowerCase().split('.').pop()
+  switch (ext) {
+    case 'json':
+      return 'json'
+    case 'csv':
+      return 'csv'
+    case 'bib':
+    case 'bibtex':
+      return 'bibtex'
+    case 'ris':
+      return 'ris'
+    case 'enw':
+    case 'endnote':
+    case 'nbib':
+      return 'endnote'
+    default:
+      return null
+  }
+}
+
 function handleBeforeUpload(file: File) {
-  const isJsonOrCsv = file.name.endsWith('.json') || file.name.endsWith('.csv')
-  if (!isJsonOrCsv) {
-    ElMessage.error('只支持 JSON/CSV 格式文件！')
+  const fileType = getFileType(file.name)
+  if (!fileType) {
+    ElMessage.error('只支持 JSON/CSV/BibTeX/RIS/EndNote 格式文件！')
     return false
   }
   importFileList.value = [{
@@ -485,16 +510,64 @@ async function handleImport() {
 
   importLoading.value = true
   try {
-    const formData = new FormData()
-    importFileList.value.forEach(file => {
-      if (file.raw) {
-        formData.append('files', file.raw)
-      }
-    })
+    let totalSuccess = 0
+    let totalFail = 0
+    let allErrors: ImportResult['errors'] = []
 
-    const result = await paperStore.importPapers(formData)
-    importResult.value = result
-    ElMessage.success('导入完成')
+    for (const fileItem of importFileList.value) {
+      if (!fileItem.raw) continue
+
+      const fileType = getFileType(fileItem.name)
+      if (!fileType) continue
+
+      let result: ImportResult | null = null
+
+      try {
+        switch (fileType) {
+          case 'csv':
+            result = await importCsv(fileItem.raw)
+            break
+          case 'bibtex':
+            result = await importBibTeX(fileItem.raw)
+            break
+          case 'ris':
+            result = await importRis(fileItem.raw)
+            break
+          case 'endnote':
+            result = await importEndNote(fileItem.raw)
+            break
+          default:
+            continue
+        }
+
+        if (result) {
+          totalSuccess += result.successCount
+          totalFail += result.failCount
+          if (result.errors && result.errors.length > 0) {
+            allErrors = [...allErrors, ...result.errors]
+          }
+        }
+      } catch (err) {
+        totalFail++
+        allErrors.push({
+          rowIndex: -1,
+          message: `${fileItem.name} 导入失败`
+        })
+      }
+    }
+
+    importResult.value = {
+      successCount: totalSuccess,
+      failCount: totalFail,
+      errors: allErrors
+    }
+
+    if (totalFail === 0) {
+      ElMessage.success('导入完成')
+    } else {
+      ElMessage.warning(`导入完成：成功 ${totalSuccess} 条，失败 ${totalFail} 条`)
+    }
+
     handleSearch()
   } catch (error) {
     console.error('Import error:', error)
@@ -529,6 +602,89 @@ onMounted(() => {
 
 .table-card {
   border-radius: 8px;
+}
+
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-wrapper :deep(.el-table) {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.table-wrapper :deep(.el-table__body-wrapper) {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-wrapper :deep(.el-table__header-wrapper) {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-wrapper :deep(.el-table__body),
+.table-wrapper :deep(.el-table__header) {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.table-wrapper :deep(.el-table__row) {
+  display: table-row;
+}
+
+.table-wrapper :deep(.el-table__cell) {
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal;
+  word-break: break-word;
+}
+
+@-moz-document url-prefix() {
+  .table-wrapper :deep(.el-table) {
+    width: 100%;
+    table-layout: fixed;
+  }
+
+  .table-wrapper :deep(.el-table__body),
+  .table-wrapper :deep(.el-table__header) {
+    width: 100% !important;
+    table-layout: fixed;
+  }
+
+  .table-wrapper :deep(.el-table__body-wrapper),
+  .table-wrapper :deep(.el-table__header-wrapper) {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .table-wrapper :deep(.el-table__row) {
+    display: table-row;
+  }
+
+  .table-wrapper :deep(.el-table__cell) {
+    display: table-cell;
+    float: none;
+  }
+}
+
+@media not all and (min-resolution:.001dpcm) {
+  @supports (-webkit-appearance:none) {
+    .table-wrapper :deep(.el-table__row) {
+      display: table-row;
+    }
+
+    .table-wrapper :deep(.el-table__body tr.el-table__row:nth-child(even) td.el-table__cell) {
+      background-color: var(--el-table-tr-bg-color);
+    }
+
+    .table-wrapper :deep(.el-table__body-wrapper) {
+      will-change: transform;
+    }
+  }
 }
 
 .table-header {

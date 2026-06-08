@@ -23,7 +23,8 @@
       <el-tabs v-model="activeTab" class="analysis-tabs">
         <el-tab-pane label="核心作者排行" name="ranking">
           <div v-loading="loading.ranking" class="tab-content">
-            <el-table :data="coreAuthors" stripe style="width: 100%">
+            <div class="table-wrapper">
+              <el-table :data="coreAuthors" stripe table-layout="fixed" style="width: 100%">
               <el-table-column type="index" label="排名" width="80" align="center">
                 <template #default="{ $index }">
                   <span v-if="$index < 3" class="rank-badge" :class="'rank-' + ($index + 1)">{{ $index + 1 }}</span>
@@ -39,7 +40,8 @@
               <el-table-column prop="totalPublications" label="发文数" width="120" sortable align="center" />
               <el-table-column prop="totalCitations" label="被引数" width="120" sortable align="center" />
               <el-table-column prop="hIndex" label="H-index" width="120" sortable align="center" />
-            </el-table>
+              </el-table>
+            </div>
           </div>
         </el-tab-pane>
 
@@ -521,6 +523,89 @@ onBeforeUnmount(() => {
 
 .tab-content {
   min-height: 500px;
+}
+
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-wrapper :deep(.el-table) {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.table-wrapper :deep(.el-table__body-wrapper) {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-wrapper :deep(.el-table__header-wrapper) {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-wrapper :deep(.el-table__body),
+.table-wrapper :deep(.el-table__header) {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.table-wrapper :deep(.el-table__row) {
+  display: table-row;
+}
+
+.table-wrapper :deep(.el-table__cell) {
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal;
+  word-break: break-word;
+}
+
+@-moz-document url-prefix() {
+  .table-wrapper :deep(.el-table) {
+    width: 100%;
+    table-layout: fixed;
+  }
+
+  .table-wrapper :deep(.el-table__body),
+  .table-wrapper :deep(.el-table__header) {
+    width: 100% !important;
+    table-layout: fixed;
+  }
+
+  .table-wrapper :deep(.el-table__body-wrapper),
+  .table-wrapper :deep(.el-table__header-wrapper) {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .table-wrapper :deep(.el-table__row) {
+    display: table-row;
+  }
+
+  .table-wrapper :deep(.el-table__cell) {
+    display: table-cell;
+    float: none;
+  }
+}
+
+@media not all and (min-resolution:.001dpcm) {
+  @supports (-webkit-appearance:none) {
+    .table-wrapper :deep(.el-table__row) {
+      display: table-row;
+    }
+
+    .table-wrapper :deep(.el-table__body tr.el-table__row:nth-child(even) td.el-table__cell) {
+      background-color: var(--el-table-tr-bg-color);
+    }
+
+    .table-wrapper :deep(.el-table__body-wrapper) {
+      will-change: transform;
+    }
+  }
 }
 
 .chart-container {

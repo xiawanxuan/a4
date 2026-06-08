@@ -37,6 +37,33 @@ public class ImportController {
         return ApiResponse.success(result);
     }
 
+    @PostMapping("/bibtex")
+    public ApiResponse<ImportResultDTO> importFromBibTeX(@RequestParam("file") MultipartFile file) {
+        if (file.isEmpty()) {
+            return ApiResponse.error(400, "上传文件不能为空");
+        }
+        ImportResultDTO result = importService.importPapersFromBibTeX(file);
+        return ApiResponse.success(result);
+    }
+
+    @PostMapping("/ris")
+    public ApiResponse<ImportResultDTO> importFromRis(@RequestParam("file") MultipartFile file) {
+        if (file.isEmpty()) {
+            return ApiResponse.error(400, "上传文件不能为空");
+        }
+        ImportResultDTO result = importService.importPapersFromRis(file);
+        return ApiResponse.success(result);
+    }
+
+    @PostMapping("/endnote")
+    public ApiResponse<ImportResultDTO> importFromEndNote(@RequestParam("file") MultipartFile file) {
+        if (file.isEmpty()) {
+            return ApiResponse.error(400, "上传文件不能为空");
+        }
+        ImportResultDTO result = importService.importPapersFromRis(file);
+        return ApiResponse.success(result);
+    }
+
     @PostMapping("/citations")
     public ApiResponse<ImportResultDTO> importCitations(@RequestBody List<Map<String, Object>> citations) {
         ImportResultDTO result = importService.importCitations(citations);
